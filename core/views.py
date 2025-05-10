@@ -27,7 +27,7 @@ class StudentListCreateView(generics.ListCreateAPIView):
         return super().get_permissions()
 
     def perform_create(self, serializer):
-        serializer.save()
+        serializer.save() 
 
 
 class StudentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
