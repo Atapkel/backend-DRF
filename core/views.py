@@ -46,7 +46,7 @@ class StudentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ClubListCreateView(generics.ListCreateAPIView):
-    queryset = Club.objects.all()
+    queryset = Club.objects.all().prefetch_related('members', 'events')
     serializer_class = ClubSerializer
 
     def get_permissions(self):
@@ -61,7 +61,7 @@ class ClubListCreateView(generics.ListCreateAPIView):
 
 
 class ClubDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Club.objects.all()
+    queryset = Club.objects.all().prefetch_related('members', 'events')
     serializer_class = ClubSerializer
 
     def get_permissions(self):
@@ -82,13 +82,13 @@ class ClubDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 
 class ClubMemberListCreateView(generics.ListCreateAPIView):
     serializer_class = ClubMemberSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAdminOrHeadOfThisClub]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         club_pk = self.kwargs.get('club_pk')
         if club_pk:
-            return ClubMember.objects.filter(club_id=club_pk)
-        return ClubMember.objects.all()
+            return ClubMember.objects.filter(club_id=club_pk).select_related('user', 'club')
+        return ClubMember.objects.all().select_related('user', 'club')
 
     def perform_create(self, serializer):
         club_pk = self.kwargs.get('club_pk')
@@ -119,20 +119,21 @@ class UserClubMembershipsView(generics.ListAPIView):
         user_pk = self.kwargs.get('user_pk')
 
         if int(user_pk) == self.request.user.id:
-            return ClubMember.objects.filter(user_id=user_pk)
+            return ClubMember.objects.filter(user_id=user_pk).select_related('user', 'club')
 
         if self.request.user.is_staff:
-            return ClubMember.objects.filter(user_id=user_pk)
+            return ClubMember.objects.filter(user_id=user_pk).select_related('user', 'club')
 
-        head_clubs = ClubMember.objects.filter(
+        # Cache this query result to avoid multiple DB hits
+        head_clubs = list(ClubMember.objects.filter(
             user=self.request.user,
             role=ClubMember.RoleChoices.HEAD
-        ).values_list('club_id', flat=True)
+        ).values_list('club_id', flat=True))
 
         return ClubMember.objects.filter(
             user_id=user_pk,
             club_id__in=head_clubs
-        )
+        ).select_related('user', 'club')
 
 
 class ClubHeadAssignView(APIView):
@@ -213,7 +214,7 @@ class EventListCreateView(generics.ListCreateAPIView):
     serializer_class = EventSerializer
 
     def get_queryset(self):
-        queryset = Event.objects.all()
+        queryset = Event.objects.all().select_related('club', 'room')
 
         club_pk = self.kwargs.get('club_pk')
         if club_pk:
@@ -258,7 +259,7 @@ class EventListCreateView(generics.ListCreateAPIView):
 
 
 class EventDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Event.objects.all()
+    queryset = Event.objects.all().select_related('club', 'room')
     serializer_class = EventSerializer
 
     def get_permissions(self):
@@ -294,21 +295,23 @@ class TicketListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         event_pk = self.kwargs.get('event_pk')
         if event_pk:
-            return Ticket.objects.filter(event_id=event_pk)
+            return Ticket.objects.filter(event_id=event_pk).select_related('event', 'student', 'event__club')
 
         if self.request.user.is_staff:
-            return Ticket.objects.all()
+            return Ticket.objects.all().select_related('event', 'student', 'event__club')
 
-        head_clubs = ClubMember.objects.filter(
+        # Cache head_clubs to avoid multiple DB hits
+        head_clubs = list(ClubMember.objects.filter(
             user=self.request.user,
             role=ClubMember.RoleChoices.HEAD
-        ).values_list('club_id', flat=True)
+        ).values_list('club_id', flat=True))
 
-        club_events = Event.objects.filter(club_id__in=head_clubs).values_list('id', flat=True)
+        # Cache club_events to avoid multiple DB hits
+        club_events = list(Event.objects.filter(club_id__in=head_clubs).values_list('id', flat=True))
 
         return Ticket.objects.filter(
             Q(student=self.request.user) | Q(event_id__in=club_events)
-        )
+        ).select_related('event', 'student', 'event__club')
 
     def get_permissions(self):
         return [permissions.IsAuthenticated()]
@@ -340,18 +343,21 @@ class TicketDetailView(generics.RetrieveDestroyAPIView):
 
     def get_queryset(self):
         if self.request.user.is_staff:
-            return Ticket.objects.all()
+            return Ticket.objects.all().select_related('event', 'student', 'event__club')
 
-        head_clubs = ClubMember.objects.filter(
+        # Cache head_clubs to avoid multiple DB hits
+        head_clubs = list(ClubMember.objects.filter(
             user=self.request.user,
             role=ClubMember.RoleChoices.HEAD
-        ).values_list('club_id', flat=True)
+        ).values_list('club_id', flat=True))
 
-        club_events = Event.objects.filter(club_id__in=head_clubs).values_list('id', flat=True)
+        # Cache club_events to avoid multiple DB hits
+        club_events = list(Event.objects.filter(club_id__in=head_clubs).values_list('id', flat=True))
 
         return Ticket.objects.filter(
             Q(student=self.request.user) | Q(event_id__in=club_events)
-        )
+        ).select_related('event', 'student', 'event__club')
+
 
     def get_permissions(self):
         return [permissions.IsAuthenticated()]
@@ -383,10 +389,11 @@ class StudentTicketsView(generics.ListAPIView):
         student_pk = self.kwargs.get('student_pk', self.request.user.id)
 
         if student_pk != self.request.user.id and not self.request.user.is_staff:
-            head_clubs = ClubMember.objects.filter(
+            # Cache head_clubs to avoid multiple DB hits
+            head_clubs = list(ClubMember.objects.filter(
                 user=self.request.user,
                 role=ClubMember.RoleChoices.HEAD
-            ).values_list('club_id', flat=True)
+            ).values_list('club_id', flat=True))
 
             if not head_clubs:
                 raise PermissionDenied("You can only view your own tickets.")
@@ -399,7 +406,8 @@ class StudentTicketsView(generics.ListAPIView):
             if not student_clubs:
                 raise PermissionDenied("You can only view tickets for members of clubs you head.")
 
-        return Ticket.objects.filter(student_id=student_pk)
+        return Ticket.objects.filter(student_id=student_pk).select_related('event', 'student', 'event__club')
+
 
 
 
@@ -412,13 +420,14 @@ class SubscriptionListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         club_pk = self.kwargs.get('club_pk')
         if club_pk:
-            return Subscription.objects.filter(club_id=club_pk)
+            return Subscription.objects.filter(club_id=club_pk).select_related('user', 'club')
 
         user_pk = self.kwargs.get('user_pk')
         if user_pk:
-            return Subscription.objects.filter(user_id=user_pk)
+            return Subscription.objects.filter(user_id=user_pk).select_related('user', 'club')
 
-        return Subscription.objects.filter(user=self.request.user)
+        return Subscription.objects.filter(user=self.request.user).select_related('user', 'club')
+
 
     def perform_create(self, serializer):
         user = serializer.validated_data.get('user', self.request.user)
@@ -440,8 +449,8 @@ class SubscriptionDetailView(generics.RetrieveDestroyAPIView):
 
     def get_queryset(self):
         if self.request.user.is_staff:
-            return Subscription.objects.all()
-        return Subscription.objects.filter(user=self.request.user)
+            return Subscription.objects.all().select_related('user', 'club')
+        return Subscription.objects.filter(user=self.request.user).select_related('user', 'club')
 
     def perform_destroy(self, instance):
         if instance.user != self.request.user and not self.request.user.is_staff:
@@ -456,18 +465,20 @@ class EventReviewListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         event_pk = self.kwargs.get('event_pk')
         if event_pk:
-            return EventReview.objects.filter(event_id=event_pk)
+            return EventReview.objects.filter(event_id=event_pk).select_related('user', 'event', 'event__club')
 
         if self.request.user.is_staff:
-            return EventReview.objects.all()
+            return EventReview.objects.all().select_related('user', 'event', 'event__club')
 
+        # Optimize the complex query with select_related
         return EventReview.objects.filter(
             Q(user=self.request.user) | Q(event__club__members__user=self.request.user,
                                           event__club__members__role=ClubMember.RoleChoices.HEAD)
-        ).distinct()
+        ).select_related('user', 'event', 'event__club').distinct()
 
     def perform_create(self, serializer):
-        user = serializer.validated_data.get('user', self.request.user)
+        user =  self.request.user
+        print(user.username)
 
         if user.id != self.request.user.id and not self.request.user.is_staff:
             raise PermissionDenied("You can only create reviews for yourself.")
@@ -492,12 +503,13 @@ class EventReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         if self.request.user.is_staff:
-            return EventReview.objects.all()
+            return EventReview.objects.all().select_related('user', 'event', 'event__club')
 
+        # Optimize the complex query with select_related
         return EventReview.objects.filter(
             Q(user=self.request.user) | Q(event__club__members__user=self.request.user,
                                           event__club__members__role=ClubMember.RoleChoices.HEAD)
-        ).distinct()
+        ).select_related('user', 'event', 'event__club').distinct()
 
     def perform_update(self, serializer):
         instance = self.get_object()

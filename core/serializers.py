@@ -179,20 +179,19 @@ class EventReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = EventReview
         fields = ['id', 'event', 'event_title', 'user', 'user_username', 'rating', 'comment', 'created_at']
-        read_only_fields = ['created_at']
+        read_only_fields = ['created_at', 'user']
 
-    def validate(self, data):
-        event = data.get('event')
-        user = data.get('user')
+    # def validate(self, data):
+    #     event = data.get('event')
+    #
+    #     if self.instance is None and EventReview.objects.filter(event=event, user=user).exists():
+    #         raise serializers.ValidationError(
+    #             {"user": "You have already reviewed this event."}
+    #         )
 
-        if self.instance is None and EventReview.objects.filter(event=event, user=user).exists():
-            raise serializers.ValidationError(
-                {"user": "You have already reviewed this event."}
-            )
+        # if not Ticket.objects.filter(event=event, student=user).exists():
+        #     raise serializers.ValidationError(
+        #         {"user": "You can only review events you have tickets for."}
+        #     )
 
-        if not Ticket.objects.filter(event=event, student=user).exists():
-            raise serializers.ValidationError(
-                {"user": "You can only review events you have tickets for."}
-            )
-
-        return data
+        # return data
