@@ -12,7 +12,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
-
+from .tasks import send_congrats_email
 class CurrentStudentView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -33,7 +33,9 @@ class StudentListCreateView(generics.ListCreateAPIView):
         return super().get_permissions()
 
     def perform_create(self, serializer):
-        serializer.save() 
+        print("creating user and sending email")
+        student = serializer.save()
+        send_congrats_email.delay(student.username, student.email)
 
 
 class StudentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):

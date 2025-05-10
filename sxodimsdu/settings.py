@@ -166,7 +166,6 @@ SIMPLE_JWT = {
 #         }
 #     }
 # }
-
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
@@ -177,3 +176,24 @@ CACHES = {
         }
     }
 }
+
+
+
+CELERY_BROKER_URL =  "redis://default:TXnvTOTIziikvLXXnPsFkmCNjLGJdqNJ@centerbeam.proxy.rlwy.net:12295"
+CELERY_RESULT_BACKEND =  "redis://default:TXnvTOTIziikvLXXnPsFkmCNjLGJdqNJ@centerbeam.proxy.rlwy.net:12295"
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'
+
+# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'# settings.py
+
+# Email Configuration (Gmail SMTP)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True  # Use TLS for port 587
+EMAIL_USE_SSL = False  # Don't use SSL
+EMAIL_HOST_USER = 'mikooosia005@gmail.com'
+EMAIL_HOST_PASSWORD = 'ootgdxkfvsdctklf'
+DEFAULT_FROM_EMAIL = 'mikooosia005@gmail.com'
