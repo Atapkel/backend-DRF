@@ -11,6 +11,8 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+
 class CurrentStudentView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -23,6 +25,7 @@ class StudentListCreateView(generics.ListCreateAPIView):
     queryset = Student.objects.all()
     serializer_class = StudentSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AnonRateThrottle, UserRateThrottle]
 
     def get_permissions(self):
         if self.request.method == 'GET':
@@ -37,6 +40,8 @@ class StudentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Student.objects.all()
     serializer_class = StudentSerializer
     permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+    throttle_classes = [AnonRateThrottle, UserRateThrottle]
+
 
     def get_queryset(self):
         qs = super().get_queryset()
