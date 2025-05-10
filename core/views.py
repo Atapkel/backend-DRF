@@ -51,7 +51,7 @@ class ClubListCreateView(generics.ListCreateAPIView):
 
     def get_permissions(self):
         if self.request.method == 'GET':
-            return [permissions.IsAuthenticated()]
+            return [permissions.AllowAny()]
         return [permissions.IsAdminUser()]
 
     def perform_create(self, serializer):
@@ -66,7 +66,7 @@ class ClubDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_permissions(self):
         if self.request.method == 'GET':
-            return [permissions.IsAuthenticated()]
+            return [permissions.AllowAny()]
         return [permissions.IsAdminUser()]
 
     def perform_update(self, serializer):
@@ -180,7 +180,7 @@ class RoomListCreateView(generics.ListCreateAPIView):
 
     def get_permissions(self):
         if self.request.method == 'GET':
-            return [permissions.IsAuthenticated()]
+            return [permissions.AllowAny()]
         return [permissions.IsAdminUser()]
 
     def perform_create(self, serializer):
@@ -195,7 +195,7 @@ class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_permissions(self):
         if self.request.method == 'GET':
-            return [permissions.IsAuthenticated()]
+            return [permissions.AllowAny()]
         return [permissions.IsAdminUser()]
 
     def perform_update(self, serializer):
@@ -228,7 +228,7 @@ class EventListCreateView(generics.ListCreateAPIView):
 
     def get_permissions(self):
         if self.request.method == 'GET':
-            return [permissions.IsAuthenticated()]
+            return [permissions.AllowAny()]
         return [permissions.IsAdminUser(), IsAdminOrHeadOfThisClub()]
 
 
@@ -263,7 +263,7 @@ class EventDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_permissions(self):
         if self.request.method == 'GET':
-            return [permissions.IsAuthenticated()]
+            return [permissions.AllowAny()]
         return [permissions.IsAdminUser(), IsAdminOrHeadOfThisClub()]
 
     def perform_update(self, serializer):
