@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator, MaxValueValidator
 
+from core.storage_backends import ClubLogoStorage, RoomImageStorage, EventImageStorage
+
 
 class Student(AbstractUser):
     faculty = models.CharField(max_length=100)
@@ -13,7 +15,12 @@ class Student(AbstractUser):
 class Club(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
-    image = models.ImageField(upload_to='club_logo/', blank=True, null=True)
+    image = models.ImageField(
+        upload_to='',
+        storage=ClubLogoStorage(),
+        blank=True,
+        null=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -41,7 +48,12 @@ class Room(models.Model):
     name = models.CharField(max_length=100)
     capacity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     location_description = models.TextField(blank=True)
-    image = models.ImageField(upload_to='room_images/', blank=True, null=True)
+    image = models.ImageField(
+        upload_to='',
+        storage=RoomImageStorage(),
+        blank=True,
+        null=True
+    )
 
     def __str__(self):
         return f"{self.name} ({self.capacity} seats)"
@@ -59,7 +71,12 @@ class Event(models.Model):
     end_date = models.DateTimeField()
     ticket_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
     total_tickets = models.PositiveIntegerField(validators=[MinValueValidator(1)])
-    image = models.ImageField(upload_to='event_images/', blank=True, null=True)
+    image = models.ImageField(
+        upload_to='',
+        storage=EventImageStorage(),
+        blank=True,
+        null=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     ticket_type = models.CharField(max_length=10, choices=TicketTypeChoices.choices,
                                    default=TicketTypeChoices.FREE)

@@ -47,6 +47,8 @@ class StudentSerializer(serializers.ModelSerializer):
 
 
 class ClubSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = Club
         fields = ['id', 'name', 'description', 'image', 'created_at']
@@ -57,6 +59,10 @@ class ClubSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"name": "A club with this name already exists."})
         return value
 
+    def get_image(self, obj):
+        if obj.image:
+            return obj.image.url
+        return None
 
 
 
@@ -84,12 +90,20 @@ class ClubMemberSerializer(serializers.ModelSerializer):
 
 
 class RoomSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = Room
         fields = ['id', 'name', 'capacity', 'location_description', 'image']
 
+    def get_image(self, obj):
+        if obj.image:
+            return obj.image.url
+        return None
+
 
 class EventSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
     club_name = serializers.ReadOnlyField(source='club.name')
     room_name = serializers.ReadOnlyField(source='room.name')
     tickets_available = serializers.ReadOnlyField()
@@ -118,6 +132,11 @@ class EventSerializer(serializers.ModelSerializer):
             )
 
         return data
+
+    def get_image(self, obj):
+        if obj.image:
+            return obj.image.url
+        return None
 
 
 class TicketSerializer(serializers.ModelSerializer):

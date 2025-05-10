@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -28,6 +29,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'drf_spectacular',
+    'storages',
     'core'
 ]
 
@@ -151,8 +153,8 @@ SPECTACULAR_SETTINGS = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,
 }
@@ -176,6 +178,23 @@ CACHES = {
         }
     }
 }
+
+
+# Minio (S3-compatible) Configuration
+AWS_ACCESS_KEY_ID = 'Pkzzomg7LQmRjtMwB2t9'  # Railway env var for access key
+AWS_SECRET_ACCESS_KEY = 'oznita1BV1wdSjp6FTb5xuiMtfH6BZHVWYPkUX1k'  # Railway env var for secret key
+AWS_STORAGE_BUCKET_NAME = 'sxodimsdu-bucket'  # Name of your Minio bucket (e.g., "rub-volume")
+AWS_S3_ENDPOINT_URL = 'https://bucket-production-34fe.up.railway.app:443'  # Railway endpoint (e.g., "https://bucket-production-34fe.up.r...")
+AWS_S3_ADDRESSING_STYLE = 'path'  # Required for Minio
+AWS_S3_USE_SSL = True  # Set to True if Railway uses HTTPS
+AWS_DEFAULT_ACL = 'public-read'  # Adjust if files need to be private
+
+AWS_S3_OBJECT_PARAMETERS = {
+    'CacheControl': 'max-age=86400',  # Cache images for 24 hours
+}
+
+# Media Files Configuration
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
 
 
