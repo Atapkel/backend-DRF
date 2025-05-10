@@ -212,7 +212,7 @@ class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
             raise PermissionDenied("Only admin users can delete rooms.")
         instance.delete()
 
-
+@method_decorator(cache_page(60 * 15, key_prefix='event_list'), name='list')
 class EventListCreateView(generics.ListCreateAPIView):
     serializer_class = EventSerializer
 
