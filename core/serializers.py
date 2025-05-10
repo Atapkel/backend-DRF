@@ -61,74 +61,138 @@ class ClubSerializer(serializers.ModelSerializer):
 
 
 class ClubMemberSerializer(serializers.ModelSerializer):
-    user = StudentSerializer(read_only=True)
-    user_id = serializers.PrimaryKeyRelatedField(
-        queryset=Student.objects.all(),
-        write_only=True,
-        source='user'
-    )
-    club = ClubSerializer(read_only=True)
-    club_id = serializers.PrimaryKeyRelatedField(
-        queryset=Club.objects.all(),
-        write_only=True,
-        source='club'
-    )
-
+    username = serializers.ReadOnlyField(source='user.username')
+    club_name = serializers.ReadOnlyField(source='club.name')
     class Meta:
         model = ClubMember
-        fields = ['id', 'user', 'user_id', 'club', 'club_id', 'role', 'joined_at']
+        fields = ['id', 'user', 'username', 'club', 'club_name', 'role', 'joined_at']
         read_only_fields = ['joined_at']
 
     def validate(self, data):
-        if 'role' in data and data['role'] == ClubMember.RoleChoices.HEAD:
-            if not self.context['request'].user.is_staff:
-                raise serializers.ValidationError("Only admins can assign HEAD role.")
+        user = data.get('user')
+        club = data.get('club')
 
-        if ClubMember.objects.filter(
-                user=data['user'],
-                club=data['club']
-        ).exists():
+        if self.instance is None and (not user or not club):
+            raise serializers.ValidationError("Both user and club are required.")
+
+        if self.instance is None and ClubMember.objects.filter(user=user, club=club).exists():
             raise serializers.ValidationError("This user is already a member of this club.")
 
-        return data
+        request = self.context.get('request')
+        if data.get('role') == ClubMember.RoleChoices.HEAD and not request.user.is_staff:
+            raise serializers.ValidationError("Only admin users can assign the HEAD role.")
 
 
-# serializers.py additions
 class RoomSerializer(serializers.ModelSerializer):
     class Meta:
         model = Room
         fields = ['id', 'name', 'capacity', 'location_description', 'image']
 
+
 class EventSerializer(serializers.ModelSerializer):
-    tickets_available = serializers.IntegerField(read_only=True)
-    tickets_sold = serializers.IntegerField(read_only=True)
+    club_name = serializers.ReadOnlyField(source='club.name')
+    room_name = serializers.ReadOnlyField(source='room.name')
+    tickets_available = serializers.ReadOnlyField()
+    tickets_sold = serializers.ReadOnlyField()
 
     class Meta:
         model = Event
-        fields = ['id', 'title', 'description', 'club', 'room', 'start_date',
-                 'end_date', 'ticket_price', 'total_tickets', 'image',
-                 'ticket_type', 'tickets_available', 'tickets_sold', 'created_at']
-        read_only_fields = ['created_at']
+        fields = [
+            'id', 'title', 'description', 'club', 'club_name',
+            'room', 'room_name', 'start_date', 'end_date',
+            'ticket_price', 'total_tickets', 'image', 'created_at',
+            'ticket_type', 'tickets_available', 'tickets_sold'
+        ]
+        read_only_fields = ['created_at', 'tickets_available', 'tickets_sold']
+
+    def validate(self, data):
+        if data.get('start_date') and data.get('end_date'):
+            if data['end_date'] <= data['start_date']:
+                raise serializers.ValidationError(
+                    {"end_date": "End date must be later than start date."}
+                )
+
+        if data.get('ticket_type') == Event.TicketTypeChoices.FREE and data.get('ticket_price', 0) > 0:
+            raise serializers.ValidationError(
+                {"ticket_price": "Free events should have a ticket price of 0."}
+            )
+
+        return data
+
 
 class TicketSerializer(serializers.ModelSerializer):
+    student_username = serializers.ReadOnlyField(source='student.username')
+    event_title = serializers.ReadOnlyField(source='event.title')
+
     class Meta:
         model = Ticket
-        fields = ['id', 'student', 'event', 'purchased_at']
+        fields = ['id', 'student', 'student_username', 'event', 'event_title', 'purchased_at']
         read_only_fields = ['purchased_at']
 
     def validate(self, data):
-        if data['event'].tickets_available <= 0:
-            raise serializers.ValidationError("No tickets available for this event")
+        event = data.get('event')
+        if event and event.tickets_available <= 0:
+            raise serializers.ValidationError(
+                {"event": "No tickets available for this event."}
+            )
+
+        student = data.get('student')
+        if student and event and Ticket.objects.filter(student=student, event=event).exists():
+            raise serializers.ValidationError(
+                {"student": "This student already has a ticket for this event."}
+            )
+
+        if event and event.ticket_type == Event.TicketTypeChoices.PAID:
+            if student.wallet_balance < event.ticket_price:
+                raise serializers.ValidationError(
+                    {"student": "Insufficient wallet balance to purchase this ticket."}
+                )
+
         return data
 
+
 class SubscriptionSerializer(serializers.ModelSerializer):
+    user_username = serializers.ReadOnlyField(source='user.username')
+    club_name = serializers.ReadOnlyField(source='club.name')
+
     class Meta:
         model = Subscription
-        fields = ['id', 'user', 'club', 'subscribed_at']
+        fields = ['id', 'user', 'user_username', 'club', 'club_name', 'subscribed_at']
         read_only_fields = ['subscribed_at']
 
+    def validate(self, data):
+        user = data.get('user')
+        club = data.get('club')
+
+        if self.instance is None and Subscription.objects.filter(user=user, club=club).exists():
+            raise serializers.ValidationError(
+                {"user": "This user is already subscribed to this club."}
+            )
+
+        return data
+
+
 class EventReviewSerializer(serializers.ModelSerializer):
+    user_username = serializers.ReadOnlyField(source='user.username')
+    event_title = serializers.ReadOnlyField(source='event.title')
+
     class Meta:
         model = EventReview
-        fields = ['id', 'event', 'user', 'rating', 'comment', 'created_at']
+        fields = ['id', 'event', 'event_title', 'user', 'user_username', 'rating', 'comment', 'created_at']
         read_only_fields = ['created_at']
+
+    def validate(self, data):
+        event = data.get('event')
+        user = data.get('user')
+
+        if self.instance is None and EventReview.objects.filter(event=event, user=user).exists():
+            raise serializers.ValidationError(
+                {"user": "You have already reviewed this event."}
+            )
+
+        if not Ticket.objects.filter(event=event, student=user).exists():
+            raise serializers.ValidationError(
+                {"user": "You can only review events you have tickets for."}
+            )
+
+        return data

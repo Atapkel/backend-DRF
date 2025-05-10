@@ -4,7 +4,12 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 class Student(AbstractUser):
-    faculty = models.CharField(max_length=100)
+    class FacultyChoices(models.TextChoices):
+        FEENS = 'FEENS', 'FEENS'
+        EDU = 'edu', 'EDU'
+        LAW = 'law', 'Law'
+        BS = 'BS', 'BS'
+    faculty = models.CharField(max_length=100, choices=FacultyChoices.choices, default=FacultyChoices.FEENS)
     speciality = models.CharField(max_length=100)
     wallet_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
 
