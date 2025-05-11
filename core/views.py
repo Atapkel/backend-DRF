@@ -1,3 +1,5 @@
+from django.http import HttpResponse
+from django.shortcuts import redirect
 from rest_framework import generics, permissions, views
 from rest_framework.response import Response
 from .serializers import *
@@ -12,7 +14,8 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
-from .tasks import send_congrats_email
+
+
 class CurrentStudentView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -33,9 +36,11 @@ class StudentListCreateView(generics.ListCreateAPIView):
         return super().get_permissions()
 
     def perform_create(self, serializer):
-        print("creating user and sending email")
         student = serializer.save()
-        send_congrats_email.delay(student.username, student.email)
+
+        # Send verification email
+        verification = EmailVerification.objects.create(user=student)
+        verification.send_verification_email()
 
 
 class StudentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
@@ -43,7 +48,6 @@ class StudentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = StudentSerializer
     permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
     throttle_classes = [AnonRateThrottle, UserRateThrottle]
-
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -103,8 +107,8 @@ class ClubMemberListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         club_pk = self.kwargs.get('club_pk')
         if club_pk:
-           club = Club.objects.get(pk=club_pk)
-           serializer.save(club=club)
+            club = Club.objects.get(pk=club_pk)
+            serializer.save(club=club)
         else:
             serializer.save()
 
@@ -120,6 +124,7 @@ class ClubMemberDetailView(generics.RetrieveUpdateDestroyAPIView):
         if new_role == ClubMember.RoleChoices.HEAD and not self.request.user.is_staff:
             raise PermissionDenied("Only admin users can assign the HEAD role.")
         serializer.save()
+
 
 class UserClubMembershipsView(generics.ListAPIView):
     serializer_class = ClubMemberSerializer
@@ -219,6 +224,7 @@ class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
             raise PermissionDenied("Only admin users can delete rooms.")
         instance.delete()
 
+
 @method_decorator(cache_page(60 * 15, key_prefix='event_list'), name='list')
 class EventListCreateView(generics.ListCreateAPIView):
     serializer_class = EventSerializer
@@ -236,12 +242,10 @@ class EventListCreateView(generics.ListCreateAPIView):
 
         return queryset
 
-
     def get_permissions(self):
         if self.request.method == 'GET':
             return [permissions.AllowAny()]
         return [permissions.IsAdminUser(), IsAdminOrHeadOfThisClub()]
-
 
     def perform_create(self, serializer):
         club_pk = self.kwargs.get('club_pk')
@@ -368,7 +372,6 @@ class TicketDetailView(generics.RetrieveDestroyAPIView):
             Q(student=self.request.user) | Q(event_id__in=club_events)
         ).select_related('event', 'student', 'event__club')
 
-
     def get_permissions(self):
         return [permissions.IsAuthenticated()]
 
@@ -419,10 +422,6 @@ class StudentTicketsView(generics.ListAPIView):
         return Ticket.objects.filter(student_id=student_pk).select_related('event', 'student', 'event__club')
 
 
-
-
-
-
 class SubscriptionListCreateView(generics.ListCreateAPIView):
     serializer_class = SubscriptionSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -437,7 +436,6 @@ class SubscriptionListCreateView(generics.ListCreateAPIView):
             return Subscription.objects.filter(user_id=user_pk).select_related('user', 'club')
 
         return Subscription.objects.filter(user=self.request.user).select_related('user', 'club')
-
 
     def perform_create(self, serializer):
         user = serializer.validated_data.get('user', self.request.user)
@@ -487,7 +485,7 @@ class EventReviewListCreateView(generics.ListCreateAPIView):
         ).select_related('user', 'event', 'event__club').distinct()
 
     def perform_create(self, serializer):
-        user =  self.request.user
+        user = self.request.user
         print(user.username)
 
         if user.id != self.request.user.id and not self.request.user.is_staff:
@@ -541,3 +539,32 @@ class EventReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
                 raise PermissionDenied("You cannot delete this review.")
 
         instance.delete()
+
+
+class VerifyEmailAPIView(APIView):
+    def get(self, request, username, code):
+        try:
+            verification = EmailVerification.objects.select_related('user').get(
+                user__username=username,  # Lookup by username
+                code=code,
+                status=EmailVerification.Status.PENDING
+            )
+
+            if verification.is_expired:
+                verification.status = EmailVerification.Status.EXPIRED
+                verification.save()
+                return Response({"error": "Verification link expired"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Mark as verified
+            verification.status = EmailVerification.Status.VERIFIED
+            verification.save()
+
+            # Update user's email verification status
+            user = verification.user
+            user.is_email_verified = True
+            user.save(update_fields=['is_email_verified'])
+
+            return Response({"success": "Email verified"}, status=status.HTTP_200_OK)
+
+        except EmailVerification.DoesNotExist:
+            return Response({"error": "Invalid link"}, status=status.HTTP_400_BAD_REQUEST)

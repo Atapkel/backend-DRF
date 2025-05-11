@@ -1,15 +1,22 @@
-from django.db import models
+from datetime import timedelta
+
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator, MaxValueValidator
+from core.tasks import send_verification_email
 
 from core.storage_backends import ClubLogoStorage, RoomImageStorage, EventImageStorage
+from django.utils.timezone import timezone, now
+import uuid
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser
+from django.db import models
 
 
 class Student(AbstractUser):
     faculty = models.CharField(max_length=100)
     speciality = models.CharField(max_length=100)
     wallet_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-
+    is_email_verified = models.BooleanField(default=False)
 
 
 class Club(models.Model):
@@ -63,6 +70,7 @@ class Event(models.Model):
     class TicketTypeChoices(models.TextChoices):
         FREE = 'free', 'Free'
         PAID = 'paid', 'Paid'
+
     title = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='events')
@@ -81,7 +89,6 @@ class Event(models.Model):
     ticket_type = models.CharField(max_length=10, choices=TicketTypeChoices.choices,
                                    default=TicketTypeChoices.FREE)
 
-
     class Meta:
         ordering = ['-start_date']
 
@@ -98,7 +105,6 @@ class Event(models.Model):
 
 
 class Ticket(models.Model):
-
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='tickets')
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='tickets')
     purchased_at = models.DateTimeField(auto_now_add=True)
@@ -134,3 +140,59 @@ class EventReview(models.Model):
 
     def __str__(self):
         return f"Review by {self.user} on {self.event}: {self.rating}"
+
+
+class EmailVerification(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'Pending', 'Pending'
+        VERIFIED = 'Verified', 'Verified'
+        EXPIRED = 'Expired', 'Expired'
+
+    code = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        db_index=True
+    )
+    user = models.ForeignKey(
+        to=settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        db_index=True
+    )
+    created = models.DateTimeField(auto_now_add=True)
+    expiration = models.DateTimeField(
+        default=now() + timedelta(minutes=15)
+    )
+    status = models.CharField(
+        max_length=50,
+        choices=Status.choices,
+        default=Status.PENDING
+    )
+
+    class Meta:
+        unique_together = ('user', 'code')
+        verbose_name = 'Email Verification'
+        verbose_name_plural = 'Email Verifications'
+
+    def __str__(self):
+        return f'Email Verification for {self.user.email}'
+
+    @property
+    def is_expired(self):
+        return now() >= self.expiration
+
+    @property
+    def is_verified(self):
+        return self.status == self.Status.VERIFIED
+
+    def send_verification_email(self):
+        send_verification_email.delay(self.user.username, self.code)
+
+    def mark_as_verified(self):
+        if not self.is_expired:
+            self.status = self.Status.VERIFIED
+            self.save(update_fields=['status'])
+
+    def update_status(self):
+        if self.is_expired and self.status != self.Status.EXPIRED:
+            self.status = self.Status.EXPIRED
+            self.save(update_fields=['status'])

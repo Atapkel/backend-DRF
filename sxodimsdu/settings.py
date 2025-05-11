@@ -30,7 +30,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_spectacular',
     'storages',
-    'core'
+    'core.apps.CoreConfig',
 ]
 
 MIDDLEWARE = [
@@ -70,16 +70,30 @@ WSGI_APPLICATION = 'sxodimsdu.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'railway',
-        'USER': 'postgres',
-        'PASSWORD': 'vQGFsGuWyEHifNBctBQJjGJoyDOxzFqm',
-        'HOST': 'yamabiko.proxy.rlwy.net',
-        'PORT': '59715',
+if not DEBUG == False:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'railway',
+            'USER': 'postgres',
+            'PASSWORD': 'vQGFsGuWyEHifNBctBQJjGJoyDOxzFqm',
+            'HOST': 'yamabiko.proxy.rlwy.net',
+            'PORT': '59715',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'sxodimsdu_db',
+            'USER': 'postgres',
+            'PASSWORD': '0000',
+            'HOST': 'localhost',
+            'PORT': '5432',
+        }
+    }
+
+DOMAIN_NAME = 'http://localhost:8080'
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -198,8 +212,8 @@ DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
 
 
-CELERY_BROKER_URL =  "redis://default:TXnvTOTIziikvLXXnPsFkmCNjLGJdqNJ@centerbeam.proxy.rlwy.net:12295"
-CELERY_RESULT_BACKEND =  "redis://default:TXnvTOTIziikvLXXnPsFkmCNjLGJdqNJ@centerbeam.proxy.rlwy.net:12295"
+CELERY_BROKER_URL =  "redis://default:TXnvTOTIziikvLXXnPsFkmCNjLGJdqNJ@centerbeam.proxy.rlwy.net:12295/0"
+CELERY_RESULT_BACKEND =  "redis://default:TXnvTOTIziikvLXXnPsFkmCNjLGJdqNJ@centerbeam.proxy.rlwy.net:12295/0"
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -208,11 +222,11 @@ CELERY_TIMEZONE = 'UTC'
 # EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'# settings.py
 
 # Email Configuration (Gmail SMTP)
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True  # Use TLS for port 587
-EMAIL_USE_SSL = False  # Don't use SSL
+EMAIL_PORT = 465
+# EMAIL_USE_TLS = True  # Use TLS for port 587
+EMAIL_USE_SSL = True
 EMAIL_HOST_USER = 'mikooosia005@gmail.com'
 EMAIL_HOST_PASSWORD = 'ootgdxkfvsdctklf'
-DEFAULT_FROM_EMAIL = 'mikooosia005@gmail.com'
+# DEFAULT_FROM_EMAIL = 'mikooosia005@gmail.com'
