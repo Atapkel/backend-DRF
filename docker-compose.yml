@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  web:
+    build: ./django
+    command: >
+      sh -c "python manage.py collectstatic --noinput &&
+             python manage.py migrate &&
+             gunicorn --bind 0.0.0.0:8000 --workers 3 core.wsgi:application"
+    env_file:
+      - .env.prod
+    networks:
+      - backend
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health-check/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  nginx:
+    build: ./nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - static_volume:/vol/static
+      - media_volume:/vol/media
+    depends_on:
+      - web
+    networks:
+      - backend
+    restart: unless-stopped
+
+  celery_worker:
+    build: .
+    command: celery -A sxodimsdu.celery.app worker --loglevel=info --concurrency=4
+    env_file:
+      - .env.prod
+    networks:
+      - backend
+    depends_on:
+      - web
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+
+  celery_beat:
+    build: .
+    command: celery -A sxodimsdu.celery.app beat --loglevel=info
+    env_file:
+      - .env.prod
+    networks:
+      - backend
+    depends_on:
+      - web
+
+volumes:
+  static_volume:
+  media_volume:
+  postgres_data:
+
+networks:
+  backend:
+    driver: bridge

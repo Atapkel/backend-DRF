@@ -1,5 +1,41 @@
 from pathlib import Path
 import os
+import environ
+
+env = environ.Env(
+    # Django
+    SECRET_KEY=str,
+    DEBUG=bool,
+    DOMAIN_NAME=str,
+    ALLOWED_HOSTS=list,
+    CSRF_TRUSTED_ORIGINS=list,
+
+    # Database
+    NAME=str,
+    USER=str,
+    PASSWORD=str,
+    HOST=str,
+    PORT=str,
+
+    # Redis/Celery
+    REDIS_URL=str,
+    CELERY_BROKER_URL=str,
+    CELERY_RESULT_BACKEND=str,
+
+    # MinIO/S3
+    AWS_ACCESS_KEY_ID=str,
+    AWS_SECRET_ACCESS_KEY=str,
+    AWS_STORAGE_BUCKET_NAME=str,
+    AWS_S3_ENDPOINT_URL=str,
+    AWS_S3_CUSTOM_DOMAIN=str,
+
+    # Email
+    EMAIL_HOST=str,
+    EMAIL_PORT=int,
+    EMAIL_USE_SSL=bool,
+    EMAIL_HOST_USER=str,
+    EMAIL_HOST_PASSWORD=str,
+)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -7,13 +43,23 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
+environ.Env.read_env(os.path.join(BASE_DIR, ".env.prod"))
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-@y%=w72m-_n50wxx=2ajb7$o#4stnrqwmxqo)(+zouui-m)_&^'
+SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env("DEBUG")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env("ALLOWED_HOSTS").split(",")
+
+CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS").split(",")
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+USE_X_FORWARDED_HOST = True
+
+USE_X_FORWARDED_PORT = True
 
 # Application definition
 
@@ -70,30 +116,30 @@ WSGI_APPLICATION = 'sxodimsdu.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-if not DEBUG == False:
+if not DEBUG:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'railway',
-            'USER': 'postgres',
-            'PASSWORD': 'vQGFsGuWyEHifNBctBQJjGJoyDOxzFqm',
-            'HOST': 'yamabiko.proxy.rlwy.net',
-            'PORT': '59715',
+            'NAME': env("NAME"),
+            'USER': env("USER"),
+            'PASSWORD': env("PASSWORD"),
+            'HOST': env("HOST"),
+            'PORT': env("PORT"),
         }
     }
 else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'sxodimsdu_db',
-            'USER': 'postgres',
-            'PASSWORD': '0000',
-            'HOST': 'localhost',
-            'PORT': '5432',
+            'NAME': env("NAME"),
+            'USER': env("USER"),
+            'PASSWORD': env("PASSWORD"),
+            'HOST': env("HOST"),
+            'PORT': env("PORT"),
         }
     }
 
-DOMAIN_NAME = 'http://localhost:8080'
+DOMAIN_NAME = env("DOMAIN_NAME")
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -127,13 +173,6 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
-
 AUTH_USER_MODEL = 'core.Student'
 
 # Default primary key field type
@@ -153,7 +192,6 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/day',  # Limit for anonymous users (100 requests per day)
         'user': '1000/day',  # Limit for authenticated users (1000 requests per day)
-
     }
 }
 
@@ -193,40 +231,41 @@ CACHES = {
     }
 }
 
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Minio (S3-compatible) Configuration
-AWS_ACCESS_KEY_ID = 'Pkzzomg7LQmRjtMwB2t9'  # Railway env var for access key
-AWS_SECRET_ACCESS_KEY = 'oznita1BV1wdSjp6FTb5xuiMtfH6BZHVWYPkUX1k'  # Railway env var for secret key
-AWS_STORAGE_BUCKET_NAME = 'sxodimsdu-bucket'  # Name of your Minio bucket (e.g., "rub-volume")
-AWS_S3_ENDPOINT_URL = 'https://bucket-production-34fe.up.railway.app:443'  # Railway endpoint (e.g., "https://bucket-production-34fe.up.r...")
-AWS_S3_ADDRESSING_STYLE = 'path'  # Required for Minio
-AWS_S3_USE_SSL = True  # Set to True if Railway uses HTTPS
-AWS_DEFAULT_ACL = 'public-read'  # Adjust if files need to be private
+if DEBUG:
+    # DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = BASE_DIR / "media"
+else:
+    # Minio (S3-compatible) Configuration
+    AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
+    AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME")
+    AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL")
+    AWS_S3_ADDRESSING_STYLE = 'path'
+    AWS_S3_USE_SSL = True
+    AWS_DEFAULT_ACL = 'public-read'
+    AWS_S3_OBJECT_PARAMETERS = {
+        'CacheControl': 'max-age=86400',
+    }
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
-AWS_S3_OBJECT_PARAMETERS = {
-    'CacheControl': 'max-age=86400',  # Cache images for 24 hours
-}
-
-# Media Files Configuration
-DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-
-
-
-CELERY_BROKER_URL =  "redis://default:TXnvTOTIziikvLXXnPsFkmCNjLGJdqNJ@centerbeam.proxy.rlwy.net:12295/0"
-CELERY_RESULT_BACKEND =  "redis://default:TXnvTOTIziikvLXXnPsFkmCNjLGJdqNJ@centerbeam.proxy.rlwy.net:12295/0"
+CELERY_BROKER_URL = env("CELERY_BROKER_URL")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND")
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 
-# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'# settings.py
-
 # Email Configuration (Gmail SMTP)
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 465
-# EMAIL_USE_TLS = True  # Use TLS for port 587
-EMAIL_USE_SSL = True
-EMAIL_HOST_USER = 'mikooosia005@gmail.com'
-EMAIL_HOST_PASSWORD = 'ootgdxkfvsdctklf'
-# DEFAULT_FROM_EMAIL = 'mikooosia005@gmail.com'
+if DEBUG:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+else:
+    EMAIL_HOST = env("EMAIL_HOST")
+    EMAIL_PORT = env("EMAIL_PORT")
+    EMAIL_USE_SSL = env("EMAIL_USE_SSL")
+    EMAIL_HOST_USER = env("EMAIL_HOST_USER")
+    EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
