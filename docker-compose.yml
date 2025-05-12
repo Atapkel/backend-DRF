@@ -2,17 +2,15 @@ version: '3.8'
 
 services:
   web:
-    build: ./django
-    command: >
-      sh -c "python manage.py collectstatic --noinput &&
-             python manage.py migrate &&
-             gunicorn --bind 0.0.0.0:8000 --workers 3 core.wsgi:application"
+    build: .
     env_file:
       - .env.prod
+    ports:
+      - "8000:8000"
     networks:
       - backend
     volumes:
-      - static_volume:/app/staticfiles
+#      - static_volume:/app/staticfiles
       - media_volume:/app/media
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health-check/"]
@@ -25,19 +23,19 @@ services:
           cpus: '0.5'
           memory: 512M
 
-  nginx:
-    build: ./nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - static_volume:/vol/static
-      - media_volume:/vol/media
-    depends_on:
-      - web
-    networks:
-      - backend
-    restart: unless-stopped
+#  nginx:
+#    build: ./nginx
+#    ports:
+#      - "80:80"
+#      - "443:443"
+#    volumes:
+#      - static_volume:/vol/static
+#      - media_volume:/vol/media
+#    depends_on:
+#      - web
+#    networks:
+#      - backend
+#    restart: unless-stopped
 
   celery_worker:
     build: .

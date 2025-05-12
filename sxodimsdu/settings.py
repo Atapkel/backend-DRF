@@ -7,8 +7,8 @@ env = environ.Env(
     SECRET_KEY=str,
     DEBUG=bool,
     DOMAIN_NAME=str,
-    ALLOWED_HOSTS=list,
-    CSRF_TRUSTED_ORIGINS=list,
+    ALLOWED_HOSTS=str,
+    CSRF_TRUSTED_ORIGINS=str,
 
     # Database
     NAME=str,
@@ -43,7 +43,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-environ.Env.read_env(os.path.join(BASE_DIR, ".env.prod"))
+environ.Env.read_env(os.path.join(BASE_DIR, "env_file"))
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env("SECRET_KEY")
